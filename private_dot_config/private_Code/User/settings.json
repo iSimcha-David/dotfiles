@@ -1,0 +1,144 @@
+{
+  "aws.cloudformation.telemetry.enabled": false,
+  "codeium.enableConfig": {
+    "*": true,
+    "nushell": true,
+    "just": true
+  },
+  "codeium.disableSupercomplete": true,
+  "codeium.enableExplainProblem": false,
+  "chat.agent.enabled": false,
+  "chat.agent.maxRequests": 0,
+  "chat.commandCenter.enabled": false,
+  "chat.notifyWindowOnConfirmation": "off",
+  "claudeCode.preferredLocation": "panel",
+  "cSpell.enableFiletypes": [
+    "nushell"
+  ],
+  "cSpell.maxNumberOfProblems": 250,
+  "cSpell.minWordLength": 3,
+  "cSpell.userWords": [
+    "codeium",
+    "coloredlogs",
+    "datetime",
+    "Deno",
+    "dockercompose",
+    "dotenv",
+    "env",
+    "nushell"
+  ],
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.maxComputationTime": 0,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.detectIndentation": false,
+  "editor.find.seedSearchStringFromSelection": "selection",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true,
+  "editor.indentSize": "tabSize",
+  "editor.insertSpaces": false,
+  "editor.rulers": [
+    120
+  ],
+  "editor.wordWrap": "wordWrapColumn",
+  "editor.wordWrapColumn": 120,
+  "files.associations": {
+    "*.nuon": "nushell",
+    "*.toml": "toml",
+    ".gcloudignore": "ignore",
+    "*.puml": "plantuml"
+  },
+  "files.autoSave": "onFocusChange",
+  "files.watcherExclude": {
+    "/ctg-data/**": true
+  },
+  "githubPullRequests.pullBranch": "never",
+  "prettier.printWidth": 120,
+  "prettier.proseWrap": "always",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "redhat.telemetry.enabled": false,
+  "remote.autoForwardPortsSource": "hybrid",
+  "remote.SSH.useExecServer": false,
+  "remote.SSH.showLoginTerminal": true,
+  "telemetry.feedback.enabled": false,
+  "telemetry.editStats.enabled": false,
+  "update.showReleaseNotes": false,
+  "window.restoreWindows": "none",
+  "workbench.editor.closeOnFileDelete": true,
+  "workbench.editor.enablePreview": false,
+  "workbench.editor.revealIfOpen": true,
+  "workbench.enableExperiments": false,
+  "workbench.list.openMode": "doubleClick",
+  "workbench.startupEditor": "none",
+  "yaml.format.enable": true,
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": [
+      "*.github/workflows/*.yaml",
+      "*.github/workflows/*.yml"
+    ],
+    "https://json.schemastore.org/github-action.json": [
+      "action.yaml",
+      "action.yml"
+    ]
+  },
+  "yaml-embedded-languages.include": {
+    "nushell": {
+      "name": "Nushell",
+      "scopeName": "source.nushell",
+      "stripIndent": true
+    }
+  },
+  "[dockercompose]": {
+    "editor.autoIndent": "full",
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": false
+  },
+  "[github-actions-workflow]": {
+    "editor.autoIndent": "full",
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.quickSuggestions": {
+      "strings": true
+    },
+    "editor.suggest.insertMode": "replace",
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 120
+  },
+  "[yaml]": {
+    "editor.autoIndent": "full",
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  }
+}

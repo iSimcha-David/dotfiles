@@ -1,0 +1,34 @@
+# https://www.chezmoi.io/user-guide/manage-machine-to-machine-differences/
+
+# Linux can create the Firefox profiles. macOS and Windows cannot.
+{{ if ne .chezmoi.os "linux" }}
+.local/share/applications/firefox*.desktop
+.local/bin/firefox-create-profiles.nu
+.local/bin/firefox-create-profiles-wrapper.nu
+{{ end }}
+
+# Do not manage some certain files for root.
+{{ if eq .chezmoi.username "root" }}
+.local/share/applications/*.desktop
+.local/bin/firefox-create-profiles.nu
+.local/bin/firefox-create-profiles-wrapper.nu
+{{ end }}
+
+# justfile is used to install the chezmoi example config.
+justfile
+
+# Ignore GTK settings
+.config/gtk-3.0/gtk.css
+.config/gtk-4.0/gtk.css
+
+.idea/
+.vscode/
+chezmoi-example.jsonc
+vim-local.d/
+.chezmoiignore
+.gitignore
+# Need to write a script to add this to the various profiles.
+#.mozilla/firefox/user.js
+LICENSE.md
+markdownlint.rc.yaml
+README.md

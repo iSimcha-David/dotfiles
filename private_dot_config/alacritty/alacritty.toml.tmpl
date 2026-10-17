@@ -1,0 +1,126 @@
+[general]
+
+# Alacritty themes
+# Bright colors
+# - ~/projects/github/alacritty-theme/themes/hyper.yaml
+# - ~/projects/github/alacritty-theme/themes/monokai_charcoal.yaml
+# - ~/projects/github/alacritty-theme/themes/blood_moon.yaml
+# Too dark grey; hostname is hard to read
+# - ~/projects/github/alacritty-theme/themes/tomorrow_night_bright.yaml
+# Too dark of blue
+# - ~/projects/github/alacritty-theme/themes/campbell.yaml
+# - ~/projects/github/alacritty-theme/themes/xterm.yaml
+# Blueish background
+# - ~/projects/github/alacritty-theme/themes/falcon.yaml
+# - ~/projects/github/alacritty-theme/themes/iterm.yaml
+# Greyish backgrounds
+# - ~/projects/github/alacritty-theme/themes/omni.yaml
+# - ~/projects/github/alacritty-theme/themes/papercolor_dark.yaml
+# Washed out colors
+# - ~/projects/github/alacritty-theme/themes/terminal_app.yaml
+# - ~/projects/github/alacritty-theme/themes/atom_dark.yaml
+import = ["{{ .chezmoi.homeDir }}/projects/github/alacritty-theme/themes/monokai_charcoal.toml"]
+
+[cursor]
+vi_mode_style = "Block"
+
+[cursor.style]
+shape = "Underline"
+
+[env]
+{{ if eq .chezmoi.os "darwin" }}
+# Alacritty on the Mac has a very basic $PATH which does not include the extra paths added in .bashrc.
+# This $PATH variable sets the path similar to .bashrc.
+# TODO: Move this to Nushell's config
+# Here's the original path using bash and .bashrc
+#   /opt/homebrew/opt/coreutils/libexec/gnubin
+#   /usr/local/bin
+#   /System/Cryptexes/App/usr/bin
+#   /usr/bin
+#   /bin
+#   /usr/sbin
+#   /sbin
+#   /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin
+#   /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin
+#   /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin
+#   /Users/dev/.cargo/bin
+#   /Users/dev/bin
+#   /Users/dev/go/bin
+#   /Users/dev/.local/bin
+#   /Users/dev/.rd/bin
+#   /Users/dev/projects/server-profile/bin
+#   /Users/dev/projects/dotfiles/bin
+#   /Users/dev
+#   /opt/homebrew/bin
+PATH = "/usr/local/bin:/opt/homebrew/opt/coreutils/libexec/gnubin:/usr/bin:/bin:/usr/sbin:/sbin:~/bin:~/go/bin:~/.cargo/bin:~/.local/bin:~/.rd/bin:/opt/homebrew/bin"
+{{ end }}
+
+[font]
+{{ if eq .chezmoi.os "darwin" }}
+# macOS Retina display with 2 terminals wide and 2 terminals high:
+# 2560x1600 = 160 x 49; font size = 13.0
+# 2048x1280 = 146 x 42; font size = 12.0
+# 1680x1050 = 140 x 43; font size = 10.0
+size = 12.0
+{{ else }}
+size = 10.0
+{{ end -}}
+
+[font.normal]
+family = "FiraCode Nerd Font Mono"
+
+[[hints.enabled]]
+command = "xdg-open"
+hyperlinks = true
+post_processing = true
+regex = "(ipfs:|ipns:|magnet:|mailto:|gemini:|gopher:|https:|http:|news:|file:|git:|ssh:|ftp:)[^\u0000-\u001F\u007F-<>\"\\s{-}\\^⟨⟩`]+"
+
+[hints.enabled.binding]
+key = "U"
+mods = "Control|Shift"
+
+[hints.enabled.mouse]
+enabled = true
+mods = "Control"
+
+[[keyboard.bindings]]
+command = "reset-and-clear.sh"
+key = "K"
+mods = "Control"
+
+# This was on the Mac. Not sure where it came from.
+#key = "Return"
+#mods = "Shift"
+#chars = "\u001B\r"
+
+[terminal.shell]
+{{ if ne .chezmoi.os "windows" -}}
+program = "/usr/local/bin/nu"
+{{ if eq .chezmoi.os "darwin" -}}
+args = [
+	"--config", "{{ .chezmoi.homeDir }}/.config/nushell/config.nu",
+	"--env-config", "{{ .chezmoi.homeDir }}/.config/nushell/env.nu"
+]
+{{- end }}
+{{- end }}
+
+{{ if eq .chezmoi.os "darwin" }}
+[window]
+option_as_alt = "Both"
+{{ end }}
+
+[window.dimensions]
+{{ if eq .chezmoi.os "darwin" }}
+# macOS Retina display with 2 terminals wide and 2 terminals high:
+# 2560x1600 = 160 x 49; font size = 13.0
+# 2048x1280 = 146 x 42; font size = 12.0
+# 1680x1050 = 140 x 43; font size = 10.0
+columns = 146
+lines = 42
+{{ else if eq .chezmoi.os "linux" }}
+columns = 159
+lines = 35
+{{ else }}
+columns = 159
+lines = 31
+{{ end -}}

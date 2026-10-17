@@ -1,0 +1,77 @@
+{{/*
+The .gitignore file interferes with the 'checkout' GitHub action. This is an attempt to identify the specific
+configuration causing the problem.
+*/}}
+{{- $isContainer := false -}}
+{{- if eq .chezmoi.os "linux" -}}
+  {{- $isContainer = eq (output "sh" "-c" "if grep --quiet '/ / rw.* overlay.* overlay' /proc/self/mountinfo; then echo -n true; else echo -n false; fi") "true" -}}
+{{- end -}}
+{{- if or (ne .chezmoi.os "linux") (not $isContainer) -}}
+
+[user]
+name = {{ .git.name | quote }}
+email = {{ .git.email | quote }}
+
+[init]
+defaultBranch = main
+
+[safe]
+# Use this to suppress the git warning when the uid of the files are different than the uid of the user.
+#directory = /path/to/safe/repository
+
+[fetch]
+# Remove any remote-tracking references that no longer exist on the remote.
+# https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---prune
+prune = true
+
+[push]
+# https://git-scm.com/docs/git-push#Documentation/git-push.txt-pushdefault
+default = simple
+
+[pull]
+# Use rebase instead of merge when pulling code.
+# https://spin.atomicobject.com/git-configurations-default/
+# Note: This causes any merge conflicts to work through all the git commits.
+# Changing to false to use "merge" rather than "rebase" for "git pull".
+rebase = false
+
+[rebase]
+# https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autosquash
+autoSquash = true
+# https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autostash
+autoStash = true
+
+[alias]
+# https://github.com/prometheus/prometheus/blob/main/RELEASE.md
+tag-release = "!f() { tag=v${1:-$(cat VERSION)} ; git tag -s ${tag} -m ${tag} && git push origin ${tag}; }; f"
+
+[core]
+editor = vim -f
+# https://www.kernel.org/pub/software/scm/git/docs/v1.7.10.1/git-config.html
+# https://git-scm.com/docs/gitattributes/1.7.3.3
+safecrlf = true
+autocrlf = false
+# https://github.com/github/gitignore
+excludesfile = ~/.gitignore_global
+pager = less
+
+[diff]
+tool = vimdiff
+# https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---color-movedltmodegt
+colorMoved = zebra
+
+[difftool]
+prompt = false
+
+[color]
+diff = auto
+status = auto
+branch = auto
+interactive = auto
+ui = true
+pager = true
+
+{{ end -}}
+################################################################################
+# vim: filetype=dosini
+################################################################################

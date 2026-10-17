@@ -1,0 +1,497 @@
+# Nushell functions and aliases
+# https://www.nushell.sh/book/aliases.html#persisting
+
+# General "ls -l" command
+export def l [...args: glob]: any -> any {
+	# When $args is empty, "ls ...$args" returns nothing
+	if ($args | is-empty) {
+		ls --long --short-names
+			| select name user group mode size modified
+			| update name {path basename}
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --long --short-names ...$args
+			| select name user group mode size modified
+			| update name {path basename}
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# General "ls -la" command
+export def la [...args: glob]: any -> any {
+	if ($args | is-empty) {
+		ls --all --long --short-names
+			| select name user group mode size modified
+			| update name {path basename}
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --all --long --short-names ...$args
+			| select name user group mode size modified
+			| update name {path basename}
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# "ls -la" command that shows the links
+export def ll [...args: glob]: any -> any {
+	if ($args | is-empty) {
+		ls --all --long --short-names
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --all --long --short-names ...$args
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# "ls -lat" command
+export def lt [...args: glob]: any -> any {
+	if ($args | is-empty) {
+		ls --all --long --short-names
+			| sort-by modified
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --all --long --short-names ...$args
+			| sort-by modified
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# "ls -lart" command
+export def lrt [...args: glob]: any -> any {
+	if ($args | is-empty) {
+		ls --all --long --short-names
+			| sort-by --reverse modified
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --all --long --short-names ...$args
+			| sort-by --reverse modified
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# "ls -larS" command
+export def lrs [...args: glob]: any -> any {
+	if ($args | is-empty) {
+		ls --all --long --short-names
+			| sort-by size
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	} else {
+		ls --all --long --short-names ...$args
+			| sort-by size
+			| select name user group mode size modified target
+			| update modified {format date "%Y-%m-%d %H:%M:%S"}
+			| table --width 999
+	}
+}
+
+
+# ripgrep all files. Not the same as repgrep-all.
+export def rga []: nothing -> any {
+	^rg --hidden --no-ignore
+}
+
+
+# fd (find) all files.
+export def fda []: nothing -> any {
+	^fd --hidden --no-ignore
+}
+
+
+# Get the hash of one or more files.
+export def get-hash [...args: glob]: nothing -> table<file: string, hash: string> {
+	use std log
+	if ($args | is-empty) {
+		use std log
+		log error "No files specified"
+		return 1
+	}
+	[...$args] | each {|it|
+		log info $"Glob: ($it)"
+		glob ($it | into string)
+	} | flatten | each {|it|
+		{
+			file: ($it | path basename),
+			hash: (open --raw $it | hash sha256)
+		}
+	} | sort-by hash
+}
+
+
+# Use a private instance of Chezmoi
+export def chezmoi-private [...args: string]: nothing -> nothing {
+	let config = ($env.HOME | path join ".config/chezmoi-private/chezmoi.jsonc")
+	^chezmoi --config $config ...$args
+}
+
+# Extract the filename from the URL headers.
+export def url-filename []: string -> string {
+	let url = $in
+	# Some servers (e.g. Forgejo/Gitea package endpoints) return 405 Method Not Allowed for HEAD.
+	# Fall back to URL-path parsing when HEAD is unavailable.
+	let headers = (try { http head $url } catch { [] })
+	let content_disposition = (
+		$headers
+		| where name =~ 'content-disposition'
+		| get value
+		| parse --regex '.*filename="?(?<filename>[^";]+)[;"]?'
+	)
+
+	if not ($content_disposition | is-empty) {
+		# Content-Disposition header might have the filename. Strip stray quotes and
+		# semicolons defensively: some endpoints (and older script versions still in
+		# circulation in container images) leave them in the captured value.
+		return (
+			$content_disposition
+			| get filename.0
+			| str trim --char '"'
+			| str trim --char ';'
+			| str trim
+		)
+	} else {
+		if ($url | str ends-with '/') {
+			use std log
+			log warning $"URL ends with a path and the HTTP headers do not have a filename. Using a generated filename"
+			return $"dl-(random uuid).bin"
+		} else {
+			return (($url | url parse).path | path basename)
+		}
+	}
+}
+
+# dl will download a file from a URL.
+export def dl [
+	url: string						# URL to download
+	--force (-f) 					# Overwrite the file if it exists
+	--path (-p): path				# Path to save the file
+	--filename (-n): string			# Filename of the file. Detected from the headers.
+	--save_path (-s): string		# Full path of the file to save. Overrides --path and --filename, and assumes --force
+	--parse							# Parse the response by content type instead of downloading raw bytes
+]: nothing -> table<name: string, value: string> {
+	let save_path = $save_path
+	let force = (
+		if ($save_path | is-not-empty) {
+			true
+		} else {
+			$force
+		}
+	)
+	let path = (
+		if ($save_path | is-not-empty) {
+			$save_path | path dirname
+		} else {
+			$path | default "." | path expand
+		}
+	)
+	let filename = (
+		if ($save_path | is-not-empty) {
+			$save_path | path basename
+		} else {
+			$filename | default ($url | url-filename)
+		}
+	)
+	let response_headers = (try { http head $url } catch { [] })
+	let full_path = ($path | path join $filename)
+
+	# "http get" streams the response while "http get --full" buffers the request. Separating the response headers
+	# from the body is not possible.
+	# https://discordapp.com/channels/601130461678272522/601130461678272524/1209936591267569675
+	if $force {
+		# Default to --raw so Nushell does not parse the response by content type (e.g. JSON, Markdown).
+		if $parse {
+			http get $url | save --progress --force $full_path
+		} else {
+			http get --raw $url | save --progress --force --raw $full_path
+		}
+	} else {
+		# Default to --raw so Nushell does not parse the response by content type (e.g. JSON, Markdown).
+		if $parse {
+			http get $url | save --progress $full_path
+		} else {
+			http get --raw $url | save --progress --raw $full_path
+		}
+	}
+	print $"Saved file to '($full_path)'"
+	$response_headers
+}
+
+
+# "git commit --message 'my changes'" with syntactic sugar to pull changes first. This makes conflict resolution
+# easier by short circuiting if the pull fails.
+export def git-commit [message: string]: nothing -> nothing {
+	git pull
+	print "---"
+	git add --update
+	git commit --signoff --message $"($message)"
+	print "---"
+	git push
+}
+
+
+# Push a new version
+export def git-version [
+	message: string,
+	version: string = "0.0.0"
+	--major (-M) = false
+	--minor (-m) = false
+	--patch (-p) = false
+]: nothing -> nothing {
+	use std log
+
+	if (which inc | is-empty) {
+		log error "inc plugin is not installed"
+		return
+	}
+
+	mut new_version = $version
+	let cur_version = (^git describe --tags --abbrev=0)
+	if $env.LAST_EXIT_CODE == 0 {
+		# Repo already has a tagged version. Use it.
+		$new_version = ($cur_version | str replace --regex '^v' '')
+	}
+
+	# Increment the version to publish
+	if $major {
+		$new_version = ($new_version | inc --major)
+	} else if $minor {
+		$new_version = ($new_version | inc --minor)
+	} else {
+		$new_version = ($new_version | inc --patch)
+	}
+
+	log info $"Publishing version ($new_version)"
+
+	git pull
+	git add --update
+	git commit --signoff --message $message
+	git checkout main
+	# FIXME: Determine the branch dynamically.
+	git merge develop
+	git tag --annotate --message $"Release ($new_version)" $new_version
+	git push origin $new_version
+	git push
+}
+
+
+# Backup the specified directory to the current directory.
+# TODO: Save the backup in another directory.
+export def backup [dir: string]: nothing -> nothing {
+	# use std log
+	# This is the equivalent tar command.
+	#   ^tar --use-compress-program zstd --create --file $"($dir)-(date now | format date "%Y%m%dT%H%M%S").tar.zstd" $dir
+	let d = ($dir | path expand | path basename)
+	if not ($d | path exists) {
+		# log error $"Directory to backup does not exist: '($d)'"
+		error make {msg: $"Directory does not exist: '($d)'"}
+	}
+	ouch compress --format tar.zst $d $"($d)-(date now | format date "%Y%m%dT%H%M%S").tar.zst"
+}
+
+# Restore the backup to the current directory.
+export def restore [archive: string]: nothing -> nothing {
+	#^tar --use-compress-program zstd --expand --file $archive
+	ouch decompress $archive
+}
+
+
+# rdp will RDP to a client at HD resolution. Prefers the Flathub FreeRDP
+# (com.freerdp.FreeRDP) because its SDL3-backed client is the only one with
+# working bidirectional clipboard on Wayland; falls back to native clients.
+export def rdp [...args: string]: nothing -> nothing {
+	if ($args | is-empty) {
+		print "Please add an argument for /v and /u"
+		return false
+	} else if ((do --ignore-errors { ^flatpak info com.freerdp.FreeRDP } | complete).exit_code == 0) {
+		^flatpak run com.freerdp.FreeRDP /w:1920 /h:1080 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which xfreerdp | is-empty) {
+		^xfreerdp /w:1920 /h:1080 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which wlfreerdp | is-empty) {
+		^wlfreerdp /w:1920 /h:1080 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which sdl-freerdp | is-empty) {
+		^sdl-freerdp /w:1920 /h:1080 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	}
+}
+
+
+# rdp4k will RDP to a client at a resolution suitable for a 4k monitor. Client
+# preference order matches rdp (see rdp comment above).
+export def rdp4k [...args: string]: nothing -> nothing {
+	if ($args | is-empty) {
+		print "Please add an argument for /v and /u"
+		return false
+	} else if ((do --ignore-errors { ^flatpak info com.freerdp.FreeRDP } | complete).exit_code == 0) {
+		^flatpak run com.freerdp.FreeRDP /w:2548 /h:1436 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which xfreerdp | is-empty) {
+		^xfreerdp /w:2548 /h:1436 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which wlfreerdp | is-empty) {
+		^wlfreerdp /w:2548 /h:1436 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	} else if not (which sdl-freerdp | is-empty) {
+		^sdl-freerdp /w:2548 /h:1436 /cache:bitmap:on,offscreen:on /compression-level:2 /network:auto +clipboard ...$args
+	}
+}
+
+# TODO: Check if this works for macOS.
+# Get the mountpoints as a table.
+export def "get-mountpoints" []: nothing -> table {
+	if (which mount | is-empty) {
+		print $"The 'mount' command is not found. Please install 'mount' and try again."
+        exit 1
+	}
+	^mount
+		| from ssv --minimum-spaces 1
+		| rename proc on_word mountpoint type_word options
+		| select proc mountpoint options
+}
+
+
+# Get certificate information for a domain or file.
+export def "cert-get" [cert: string]: nothing -> nothing {
+	if (which cfssl-certinfo | is-empty) {
+		print $"Could not find 'cfssl-certinfo' binary. Please install 'cfssl-certinfo' and try again."
+		exit 1
+	}
+	mut option = "-domain"
+	if ($cert | path exists) and (($cert | path type) == "file") {
+		$option = "-file"
+	}
+	^cfssl-certinfo ...[
+		$option $cert
+	] | from json | select subject sans not_after not_before issuer
+}
+
+# find_dir will traverse the directories up until it finds the "name"d directory.
+export def find-dir-parent [name: string]: [nothing -> string, nothing -> nothing] {
+	mut $dir = $env.PWD
+	mut $parent_dir = ($dir | path dirname)
+	mut $count = 0
+	# Maximum number of iterations (directories) before exiting.
+	let max_count = 20
+
+	while ($parent_dir != $dir) {
+		if ($dir | path join $name | path exists) {
+			return ($dir | path join $name)
+		}
+		$dir = $parent_dir
+		$parent_dir = ($parent_dir | path dirname)
+		$count += 1
+		if ($count > $max_count) {
+			print $"Maximum number of iterations reached"
+			print $"count: ($count)"
+			print $"max_count: ($max_count)"
+			return null
+		}
+	}
+	if ($parent_dir == $dir) {
+		# Did not find the directory
+		return null
+	} else {
+		# This is an error condition and should not be reached.
+		print $"Did not find '($name)' directory in loop, and did not reach root of drive."
+		print $"dir: ($dir)"
+		print $"parent_dir: ($parent_dir)"
+		return null
+	}
+}
+
+# waypipe-ssh wraps `waypipe ssh` and forces Lavapipe (software Vulkan ICD) when the local
+# real Vulkan stack lacks VK_EXT_image_drm_format_modifier on at least one physical device.
+#
+# Why: waypipe-client matches the server's main_device dev_t against local Vulkan devices.
+# If the matched device is missing the extension (e.g. RADV on Polaris/GFX8), waypipe panics
+# at dmabuf.rs because the extension is gated to GFX9+ in Mesa. Forcing Lavapipe via
+# VK_DRIVER_FILES bypasses the dev_t lookup and uses the software ICD, which advertises the
+# extension with a LINEAR-only modifier list. Fall-through cost is CPU buffer transcode, fine
+# for terminal-class apps.
+#
+# Lavapipe is not auto-selected by the loader when a real ICD is present; the env var is
+# scoped to the waypipe child process so the rest of the system keeps GPU acceleration.
+export def waypipe-ssh [...args: string]: nothing -> nothing {
+	let lvp_icd = "/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+	if (vulkan-needs-lavapipe-fallback) {
+		if not ($lvp_icd | path exists) {
+			use std log
+			log warning "Local Vulkan is missing VK_EXT_image_drm_format_modifier on at least one device, and Lavapipe ICD is not installed."
+			log info "Install with: sudo zypper install libvulkan_lvp"
+			return
+		}
+		with-env { VK_DRIVER_FILES: $lvp_icd } {
+			^waypipe ssh ...$args
+		}
+	} else {
+		^waypipe ssh ...$args
+	}
+}
+
+
+# vulkan-needs-lavapipe-fallback returns true when at least one local Vulkan physical device
+# is missing VK_EXT_image_drm_format_modifier. waypipe selects the local device by matching the
+# server's main_device dev_t, so a single broken device in the set is enough to trigger the
+# panic; falling back to Lavapipe is the safe default.
+def vulkan-needs-lavapipe-fallback []: nothing -> bool {
+	if (which vulkaninfo | is-empty) {
+		# No way to probe; let waypipe try its luck.
+		return false
+	}
+	let result = (^vulkaninfo | complete)
+	if $result.exit_code != 0 {
+		return false
+	}
+	let lines = ($result.stdout | lines)
+	# "Device Extensions: count = N" appears once per physical device in full vulkaninfo output.
+	let n_gpus = ($lines | where ($it | str starts-with 'Device Extensions:') | length)
+	let n_ext = (
+		$lines
+		| where ($it | str trim | str starts-with 'VK_EXT_image_drm_format_modifier')
+		| length
+	)
+	$n_gpus > 0 and $n_ext < $n_gpus
+}
+
+
+# https://discord.com/channels/601130461678272522/615253963645911060/1222952319105368225
+# table-diff will compare the difference between two tables.
+export def table-diff [
+	left: list<any>,
+	right: list<any>,
+	--keys (-k): list<string> = [],
+] {
+	let left = if ($left | describe) !~ '^table' { $left | wrap value } else { $left }
+	let right = if ($right | describe) !~ '^table' { $right | wrap value } else { $right }
+	let left_selected = ($left | select ...$keys)
+	let right_selected = ($right | select ...$keys)
+	let left_not_in_right = (
+		$left |
+		where { |row| not (($row | select ...$keys) in $right_selected) }
+	)
+	let right_not_in_left = (
+		$right |
+		where { |row| not (($row | select ...$keys) in $left_selected) }
+	)
+	(
+		$left_not_in_right | insert side '<='
+	) ++ (
+		$right_not_in_left | insert side '=>'
+	)
+}
