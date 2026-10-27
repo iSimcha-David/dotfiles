@@ -73,7 +73,11 @@ def reset-common-submodule []: nothing -> record<ok: bool, error: string> {
 	{ ok: ($result.exit_code == 0), error: ($result.stderr | str trim) }
 }
 
-export def "repos pull" [] {
+# --untracked also pulls repos whose only changes are untracked files. That is safe: git pull aborts
+# without touching the repo if an incoming file would overwrite an untracked one.
+export def "repos pull" [
+	--untracked # Pull repos that have untracked files but no staged or unstaged changes
+] {
 	repo-paths
 	| each {|it|
 		let relative = ($it | path relative-to (pwd))
@@ -85,22 +89,28 @@ export def "repos pull" [] {
 			return { repo: $relative, status: $"(ansi red_bold)error: submodule reset failed: ($before.error)(ansi reset)" }
 		}
 
-		let porcelain = (git status --porcelain)
-		if ($porcelain | is-empty) {
-			let result = (git pull | complete)
-			if $result.exit_code == 0 {
-				# The pull may move the recorded submodule commit.
-				let after = (reset-common-submodule)
-				if $after.ok {
-					{ repo: $relative, status: ($result.stdout | str trim) }
-				} else {
-					{ repo: $relative, status: $"(ansi red_bold)error: submodule reset failed: ($after.error)(ansi reset)" }
-				}
-			} else {
-				{ repo: $relative, status: $"(ansi red_bold)error: ($result.stderr | str trim)(ansi reset)" }
-			}
+		let status = (^git status --porcelain | complete)
+		if $status.exit_code != 0 {
+			return { repo: $relative, status: $"(ansi red_bold)error: git status failed: ($status.stderr | str trim)(ansi reset)" }
+		}
+		let porcelain = ($status.stdout | lines)
+		if ($porcelain | any {|line| not ($line | str starts-with "??")}) {
+			return { repo: $relative, status: $"(ansi yellow_bold)skipped \(has changes\)(ansi reset)" }
+		}
+		if not ($porcelain | is-empty) and not $untracked {
+			return { repo: $relative, status: $"(ansi yellow_bold)skipped \(has untracked files, use --untracked\)(ansi reset)" }
+		}
+
+		let result = (^git pull | complete)
+		if $result.exit_code != 0 {
+			return { repo: $relative, status: $"(ansi red_bold)error: ($result.stderr | str trim)(ansi reset)" }
+		}
+		# The pull may move the recorded submodule commit.
+		let after = (reset-common-submodule)
+		if $after.ok {
+			{ repo: $relative, status: ($result.stdout | str trim) }
 		} else {
-			{ repo: $relative, status: $"(ansi yellow_bold)skipped \(has changes\)(ansi reset)" }
+			{ repo: $relative, status: $"(ansi red_bold)error: submodule reset failed: ($after.error)(ansi reset)" }
 		}
 	}
 }
@@ -137,11 +147,11 @@ export def "repos branch-delete" [] {
 	}
 }
 
-def main [command: string, --list, --remote] {
+def main [command: string, --list, --remote, --untracked] {
 	match $command {
 		"status" => { repos status --list=$list --remote=$remote }
-		"pull" => { repos pull }
+		"pull" => { repos pull --untracked=$untracked }
 		"branch-delete" => { repos branch-delete }
-		_ => { print $"Unknown command: ($command)" }
+		_ => { error make { msg: $"Unknown command: ($command)" } }
 	}
 }
