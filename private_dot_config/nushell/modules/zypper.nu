@@ -36,10 +36,13 @@ export def "zypper search" [
 		let text = ($errors.0.content?.0?.content? | default ($errors.0 | to nuon))
 		error make {msg: $"zypper search failed: ($text)"}
 	}
-	# On no match zypper emits only <message>No matching items found.</message>.
+	# On no match zypper exits 104 and emits only <message>No matching items found.</message>.
+	if $run.exit_code == 104 {
+		return []
+	}
 	let result = ($parsed.content | where tag? == "search-result")
 	if ($result | is-empty) {
-		return []
+		error make {msg: $"zypper search exited 0 without a <search-result>: ($run.stdout | str trim)"}
 	}
 	$result.0.content.0.content.attributes
 	#| reject status kind arch
